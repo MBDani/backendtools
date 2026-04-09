@@ -39,17 +39,17 @@ class ProductControllerTest {
     private ProductSortingUseCase productSortingUseCase;
 
     @Test
-    @DisplayName("POST /sort returns 200 with products in order")
-    void sortProducts_returns200WithSortedProducts() throws Exception {
+    @DisplayName("POST /sort returns 200 with products including stock breakdown")
+    void sortProducts_returns200WithSortedProductsAndStock() throws Exception {
         List<Product> ranked = List.of(
-                product(5, "CONTRASTING LACE T-SHIRT", 650),
-                product(1, "V-NECK BASIC SHIRT", 100)
+                product(5, "CONTRASTING LACE T-SHIRT", 650,
+                        new SizeStock("S", 0), new SizeStock("M", 1), new SizeStock("L", 0)),
+                product(1, "V-NECK BASIC SHIRT", 100,
+                        new SizeStock("S", 4), new SizeStock("M", 9), new SizeStock("L", 0))
         );
         when(productSortingUseCase.sortProducts(anyList())).thenReturn(ranked);
 
-        SortRequestDto request = new SortRequestDto(List.of(
-                new CriteriaDto("sales_units", 1.0)
-        ));
+        SortRequestDto request = new SortRequestDto(List.of(new CriteriaDto("sales_units", 1.0)));
 
         mockMvc.perform(post("/api/v1/products/sort")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -57,7 +57,13 @@ class ProductControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(5))
                 .andExpect(jsonPath("$[0].name").value("CONTRASTING LACE T-SHIRT"))
-                .andExpect(jsonPath("$[1].id").value(1));
+                .andExpect(jsonPath("$[0].stock[0].size").value("S"))
+                .andExpect(jsonPath("$[0].stock[0].quantity").value(0))
+                .andExpect(jsonPath("$[0].stock[1].size").value("M"))
+                .andExpect(jsonPath("$[0].stock[1].quantity").value(1))
+                .andExpect(jsonPath("$[1].id").value(1))
+                .andExpect(jsonPath("$[1].stock[2].size").value("L"))
+                .andExpect(jsonPath("$[1].stock[2].quantity").value(0));
     }
 
     @Test
@@ -98,10 +104,10 @@ class ProductControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
-    private Product product(int id, String name, int salesUnits) {
+    private Product product(int id, String name, int salesUnits, SizeStock... sizes) {
         return Product.builder()
                 .id(id).name(name).salesUnits(salesUnits)
-                .stock(List.of(new SizeStock("S", 5)))
+                .stock(List.of(sizes))
                 .build();
     }
 }

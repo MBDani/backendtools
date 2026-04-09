@@ -29,8 +29,8 @@ class ProductSortingIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @DisplayName("weighted sort with sales(0.4) + stock(0.6) returns all 6 products in expected order")
-    void sortProducts_withSalesAndStockCriteria_returnsCorrectOrder() throws Exception {
+    @DisplayName("weighted sort sales(0.4) + stock(0.6) returns 6 products in expected order with stock breakdown")
+    void sortProducts_withSalesAndStockCriteria_returnsCorrectOrderWithStock() throws Exception {
         SortRequestDto request = new SortRequestDto(List.of(
                 new CriteriaDto("sales_units", 0.4),
                 new CriteriaDto("stock_ratio", 0.6)
@@ -41,12 +41,36 @@ class ProductSortingIntegrationTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(6)))
-                .andExpect(jsonPath("$[0].id").value(3))   // RAISED PRINT T-SHIRT       64.92
-                .andExpect(jsonPath("$[1].id").value(2))   // CONTRASTING FABRIC T-SHIRT 63.08
-                .andExpect(jsonPath("$[2].id").value(6))   // SLOGAN T-SHIRT             61.23
-                .andExpect(jsonPath("$[3].id").value(4))   // PLEATED T-SHIRT            60.18
-                .andExpect(jsonPath("$[4].id").value(5))   // CONTRASTING LACE T-SHIRT   60.00
-                .andExpect(jsonPath("$[5].id").value(1));  // V-NECK BASIC SHIRT         46.15
+                // Ranking by score (sales*0.4 + stock*0.6)
+                .andExpect(jsonPath("$[0].id").value(3))   // RAISED PRINT       score=64.92
+                .andExpect(jsonPath("$[1].id").value(2))   // CONTRASTING FABRIC score=63.08
+                .andExpect(jsonPath("$[2].id").value(6))   // SLOGAN              score=61.23
+                .andExpect(jsonPath("$[3].id").value(4))   // PLEATED             score=60.18
+                .andExpect(jsonPath("$[4].id").value(5))   // CONTRASTING LACE   score=60.00
+                .andExpect(jsonPath("$[5].id").value(1));   // V-NECK BASIC        score=46.15
+    }
+
+    @Test
+    @DisplayName("pure stock ratio ranking: last place has only 1 in-stock size (CONTRASTING LACE)")
+    void sortProducts_withOnlyStockCriteria_lastProductHasWorstStockAndIsVisibleInResponse() throws Exception {
+        SortRequestDto request = new SortRequestDto(List.of(
+                new CriteriaDto("stock_ratio", 1.0)
+        ));
+
+        mockMvc.perform(post("/api/v1/products/sort")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                // Last product: CONTRASTING LACE T-SHIRT — only M has stock (1/3 sizes)
+                .andExpect(jsonPath("$[5].id").value(5))
+                .andExpect(jsonPath("$[5].name").value("CONTRASTING LACE T-SHIRT"))
+                .andExpect(jsonPath("$[5].stock", hasSize(3)))
+                .andExpect(jsonPath("$[5].stock[0].size").value("S"))
+                .andExpect(jsonPath("$[5].stock[0].quantity").value(0))
+                .andExpect(jsonPath("$[5].stock[1].size").value("M"))
+                .andExpect(jsonPath("$[5].stock[1].quantity").value(1))
+                .andExpect(jsonPath("$[5].stock[2].size").value("L"))
+                .andExpect(jsonPath("$[5].stock[2].quantity").value(0));
     }
 
     @Test
@@ -60,23 +84,10 @@ class ProductSortingIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(5))   // CONTRASTING LACE T-SHIRT 650 units
-                .andExpect(jsonPath("$[5].id").value(4));  // PLEATED T-SHIRT           3 units
-    }
-
-    @Test
-    @DisplayName("pure stock ratio ranking puts full-stock products first")
-    void sortProducts_withOnlyStockCriteria_putsFullStockProductsFirst() throws Exception {
-        SortRequestDto request = new SortRequestDto(List.of(
-                new CriteriaDto("stock_ratio", 1.0)
-        ));
-
-        mockMvc.perform(post("/api/v1/products/sort")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[4].id").value(1))   // V-NECK BASIC SHIRT  2/3 sizes
-                .andExpect(jsonPath("$[5].id").value(5));  // CONTRASTING LACE    1/3 sizes
+                .andExpect(jsonPath("$[0].id").value(5))
+                .andExpect(jsonPath("$[0].salesUnits").value(650))
+                .andExpect(jsonPath("$[5].id").value(4))
+                .andExpect(jsonPath("$[5].salesUnits").value(3));
     }
 
     @Test

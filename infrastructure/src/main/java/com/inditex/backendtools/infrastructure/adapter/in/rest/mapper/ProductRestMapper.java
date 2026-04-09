@@ -2,8 +2,10 @@ package com.inditex.backendtools.infrastructure.adapter.in.rest.mapper;
 
 import com.inditex.backendtools.domain.model.Product;
 import com.inditex.backendtools.domain.model.ScoringCriteria;
+import com.inditex.backendtools.domain.model.SizeStock;
 import com.inditex.backendtools.infrastructure.adapter.in.rest.dto.CriteriaDto;
 import com.inditex.backendtools.infrastructure.adapter.in.rest.dto.ProductResponseDto;
+import com.inditex.backendtools.infrastructure.adapter.in.rest.dto.SizeStockResponseDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -20,4 +22,6 @@ public interface ProductRestMapper {
     ProductResponseDto toResponse(Product product);
 
     List<ProductResponseDto> toResponse(List<Product> products);
+
+    SizeStockResponseDto toResponse(SizeStock sizeStock);
 }
